@@ -3,8 +3,12 @@ import {
   normalizeProjectHostSetupRow,
   normalizeProjectRow
 } from './project-catalog-row-normalization'
-import { normalizeGitHubRemoteHost } from './git-remote-host-alias'
+import { getCheckoutRemote } from './git-remote-identity'
 import { githubRepoIdentityKey, isDefaultGitHubHost } from './github/repository-identity-key'
+import {
+  parseGitHubCanonicalKey,
+  parseGitHubRemoteUrl
+} from './github/repository-identity-from-remote'
 import type { Project, ProjectHostSetup, ProjectProviderIdentity } from './project-types'
 import type { Repo } from './repo-types'
 
@@ -68,7 +72,16 @@ function getProjectGitRemoteIdentity(
     typeof identity?.canonicalKey === 'string' ? identity.canonicalKey.trim() : ''
   const remoteName = typeof identity?.remoteName === 'string' ? identity.remoteName.trim() : ''
   const remoteUrl = typeof identity?.remoteUrl === 'string' ? identity.remoteUrl.trim() : ''
-  return canonicalKey && remoteName && remoteUrl ? { canonicalKey, remoteName, remoteUrl } : null
+  return canonicalKey && remoteName && remoteUrl
+    ? // Why carry `origin`: the project row is the repo's identity, and a copy that drops the
+      // checkout remote would read as "this project is its template" to any later consumer.
+      {
+        canonicalKey,
+        remoteName,
+        remoteUrl,
+        ...(identity?.origin ? { origin: identity.origin } : {})
+      }
+    : null
 }
 
 /** True when the repo resolves to a GitHub provider identity (via explicit
@@ -98,9 +111,36 @@ export function isProjectRemoteIdentityPending(
 
 const HOST_LOCAL_PROJECT_ID_PREFIX = 'repo:'
 
+/**
+ * The repo this checkout *is*, as a project id — its own remote, never the fork parent or template
+ * it descends from. Null while no remote identity has been probed yet.
+ */
+function getProjectCheckoutIdentityKey(repo: Pick<Repo, 'gitRemoteIdentity'>): string | null {
+  const identity = repo.gitRemoteIdentity
+  if (!identity) {
+    return null
+  }
+  const checkout = getCheckoutRemote(identity)
+  // Why the same parse order and namespaces as the provider path: a checkout-keyed row must still
+  // merge with the hosts whose rows resolved their identity through `upstream` metadata alone.
+  const providerIdentity =
+    parseGitHubRemoteUrl(checkout.remoteUrl) ?? parseGitHubCanonicalKey(checkout.canonicalKey)
+  if (providerIdentity) {
+    return getProjectIdForProviderIdentity(providerIdentity)
+  }
+  const canonicalKey = checkout.canonicalKey.trim()
+  return canonicalKey ? `git:${canonicalKey}` : null
+}
+
 export function getProjectIdentityKey(
   repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string {
+  // Why first: `upstream` and the avatar icon below name the fork/template ancestor, which every
+  // sibling checkout shares — keying on it collapsed unrelated projects into one.
+  const checkoutKey = getProjectCheckoutIdentityKey(repo)
+  if (checkoutKey) {
+    return checkoutKey
+  }
   const identity = getProjectProviderIdentity(repo)
   if (identity) {
     return getProjectIdForProviderIdentity(identity)
@@ -129,86 +169,6 @@ function getProjectId(
   repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string {
   return getProjectIdentityKey(repo)
-}
-
-function isGitHubRemoteHost(host: string): boolean {
-  const hostname = host.toLowerCase().replace(/:\d+$/, '')
-  // A generic git remote is provider-neutral. Only infer GHES when the host
-  // itself carries a GitHub/GHE signal; upstream/icon metadata handles custom names.
-  return (
-    isDefaultGitHubHost(hostname) ||
-    hostname.startsWith('github.') ||
-    hostname.startsWith('github-') ||
-    hostname.startsWith('ghe.') ||
-    hostname.startsWith('ghe-')
-  )
-}
-
-function projectProviderIdentity(
-  host: string,
-  owner: string,
-  repo: string
-): ProjectProviderIdentity | null {
-  const normalizedHost = normalizeGitHubRemoteHost(host)
-  if (!isGitHubRemoteHost(normalizedHost)) {
-    return null
-  }
-  return {
-    provider: 'github',
-    owner,
-    repo,
-    ...(!isDefaultGitHubHost(normalizedHost) ? { host: normalizedHost } : {})
-  }
-}
-
-function parseGitHubRemotePath(path: string): { owner: string; repo: string } | null {
-  const parts = path.replace(/^\/+/, '').replace(/\/+$/, '').split('/')
-  if (parts.length !== 2) {
-    return null
-  }
-  const [owner, repoWithSuffix] = parts
-  const repo = repoWithSuffix?.replace(/\.git$/i, '')
-  return owner && repo ? { owner, repo } : null
-}
-
-function parseGitHubCanonicalKey(canonicalKey: string | undefined): ProjectProviderIdentity | null {
-  const trimmed = canonicalKey?.trim()
-  if (!trimmed) {
-    return null
-  }
-  const slash = trimmed.indexOf('/')
-  if (slash <= 0) {
-    return null
-  }
-  const host = trimmed.slice(0, slash)
-  const path = parseGitHubRemotePath(trimmed.slice(slash + 1))
-  return path ? projectProviderIdentity(host, path.owner, path.repo) : null
-}
-
-function parseGitHubRemoteUrl(remoteUrl: string | undefined): ProjectProviderIdentity | null {
-  const trimmed = remoteUrl?.trim()
-  if (!trimmed) {
-    return null
-  }
-  const sshMatch = trimmed.match(/^git@([^:]+):([^/]+)\/([^/]+?)(?:\.git)?$/i)
-  if (sshMatch?.[1] && sshMatch[2] && sshMatch[3]) {
-    return projectProviderIdentity(sshMatch[1], sshMatch[2], sshMatch[3])
-  }
-  try {
-    const url = new URL(trimmed)
-    if (!['git:', 'git+ssh:', 'http:', 'https:', 'ssh:'].includes(url.protocol.toLowerCase())) {
-      return null
-    }
-    const path = parseGitHubRemotePath(url.pathname)
-    if (!path) {
-      return null
-    }
-    // HTTP ports identify the API endpoint; SSH/git ports are transport-only.
-    const host = url.protocol === 'http:' || url.protocol === 'https:' ? url.host : url.hostname
-    return projectProviderIdentity(host, path.owner, path.repo)
-  } catch {
-    return null
-  }
 }
 
 // Why: `addedAt || now` restamps Date.now() when addedAt is 0 / absent / NaN, so every

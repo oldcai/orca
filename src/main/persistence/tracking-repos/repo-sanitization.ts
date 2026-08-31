@@ -45,14 +45,36 @@ export function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | n
     canonicalKey?: unknown
     remoteName?: unknown
     remoteUrl?: unknown
+    origin?: unknown
   }
   const canonicalKey =
     typeof candidate.canonicalKey === 'string' ? candidate.canonicalKey.trim() : ''
   const remoteName = typeof candidate.remoteName === 'string' ? candidate.remoteName.trim() : ''
   const remoteUrl = typeof candidate.remoteUrl === 'string' ? candidate.remoteUrl.trim() : ''
+  const origin = sanitizeCheckoutOriginRemote(candidate.origin)
   return canonicalKey && remoteName && remoteUrl
-    ? { canonicalKey, remoteName, remoteUrl }
+    ? {
+        canonicalKey,
+        remoteName,
+        remoteUrl,
+        // Why kept optional: rows written before the checkout origin existed re-acquire it on the
+        // next identity refresh, and repos whose pick already is origin never carry one.
+        ...(origin ? { origin } : {})
+      }
     : undefined
+}
+
+function sanitizeCheckoutOriginRemote(
+  value: unknown
+): NonNullable<GitRemoteIdentity['origin']> | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+  const candidate = value as { canonicalKey?: unknown; remoteUrl?: unknown }
+  const canonicalKey =
+    typeof candidate.canonicalKey === 'string' ? candidate.canonicalKey.trim() : ''
+  const remoteUrl = typeof candidate.remoteUrl === 'string' ? candidate.remoteUrl.trim() : ''
+  return canonicalKey && remoteUrl ? { canonicalKey, remoteUrl } : undefined
 }
 
 export function sanitizeRepoProjectHostSetupMethod(

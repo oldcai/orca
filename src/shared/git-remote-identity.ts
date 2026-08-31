@@ -4,6 +4,12 @@ export type GitRemoteIdentity = {
   canonicalKey: string
   remoteName: string
   remoteUrl: string
+  /**
+   * The checkout's own `origin`, recorded only when the pick above is a different remote (a fork
+   * parent, or the template a site was generated from). Project identity keys on this: the
+   * ancestor names where PRs and issues live, not which checkout this is.
+   */
+  origin?: { canonicalKey: string; remoteUrl: string }
 }
 
 export type GitRemoteKeyParts = {
@@ -133,11 +139,24 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
       return priority === 0 ? left.name.localeCompare(right.name) : priority
     })
   const selected = entries[0]
-  return selected
-    ? {
-        canonicalKey: selected.canonicalKey,
-        remoteName: selected.name,
-        remoteUrl: selected.url
-      }
-    : null
+  if (!selected) {
+    return null
+  }
+  const origin = entries.find((entry) => entry.name === 'origin')
+  return {
+    canonicalKey: selected.canonicalKey,
+    remoteName: selected.name,
+    remoteUrl: selected.url,
+    ...(origin && origin.canonicalKey !== selected.canonicalKey
+      ? { origin: { canonicalKey: origin.canonicalKey, remoteUrl: origin.url } }
+      : {})
+  }
+}
+
+/** The remote that says which repo this checkout *is*, as opposed to which repo it descends from. */
+export function getCheckoutRemote(identity: GitRemoteIdentity): {
+  canonicalKey: string
+  remoteUrl: string
+} {
+  return identity.origin ?? { canonicalKey: identity.canonicalKey, remoteUrl: identity.remoteUrl }
 }

@@ -66,7 +66,13 @@ function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentit
   // Why: a resolved identity is replaced only by a probe that found a genuinely different repo.
   // Failures and no-remote answers must never clear it — consumers read an absent identity as
   // "unknown" and gate permissively, so losing one is worse than carrying a stale one.
-  return !!probed && probed.canonicalKey !== existing.canonicalKey
+  // The checkout origin counts as different: rows resolved before it existed carry a project
+  // identity taken from their fork/template parent until a refresh backfills it.
+  return (
+    !!probed &&
+    (probed.canonicalKey !== existing.canonicalKey ||
+      probed.origin?.canonicalKey !== existing.origin?.canonicalKey)
+  )
 }
 
 function writeIdentity(
