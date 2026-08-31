@@ -83,4 +83,18 @@ describe('NativeChatMessageList assistant messages', () => {
     expect(screen.queryByText('1×')).toBeNull()
     expect(document.querySelector('.text-destructive')).toBeNull()
   })
+
+  it('uses a stable working label instead of bouncing placeholder dots', () => {
+    const { container } = render(
+      <NativeChatMessageList
+        session={{ ...session, status: 'working', messages: [] }}
+        isWorking
+        expandSignal={false}
+        fontScale={1}
+      />
+    )
+
+    expect(screen.getByText('Working…')).toBeInTheDocument()
+    expect(container.querySelector('.animate-bounce')).toBeNull()
+  })
 })
