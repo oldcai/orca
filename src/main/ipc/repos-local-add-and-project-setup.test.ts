@@ -378,6 +378,55 @@ describe('repos:add + repos:clone', () => {
     expect(mockStore.removeProject).not.toHaveBeenCalled()
   })
 
+  it('accepts a carried identity that only adds the origin a pre-upgrade row predates', async () => {
+    const templateIdentity = {
+      canonicalKey: 'github.com/TemplateHQ/site-template',
+      remoteName: 'upstream',
+      remoteUrl: 'https://github.com/TemplateHQ/site-template.git'
+    }
+    // Why pre-upgrade: rows written before the origin field existed carry only the ancestor key
+    // until their next probe, and refusing them would fail the import for hours.
+    const existing = {
+      id: 'repo-pre-upgrade',
+      path: '/tmp/site-src',
+      displayName: 'src',
+      kind: 'git',
+      gitRemoteIdentity: templateIdentity
+    }
+    const repos = [existing as Record<string, unknown>]
+    mockStore.getRepos.mockImplementation(() => repos)
+    mockStore.updateRepo.mockImplementation((id, updates) => {
+      const repo = repos.find((entry) => entry.id === id)
+      if (!repo) {
+        return null
+      }
+      Object.assign(repo, updates)
+      return { ...repo }
+    })
+    mockStore.getProjects.mockImplementation(() => {
+      const identity = existing.gitRemoteIdentity as { origin?: unknown }
+      return identity.origin
+        ? [{ id: 'github:alice/site', displayName: 'site', gitRemoteIdentity: identity }]
+        : []
+    })
+
+    const result = await handlers.get('projectHostSetups:setupExistingFolder')!(null, {
+      projectId: 'github:alice/site',
+      projectGitRemoteIdentity: {
+        ...templateIdentity,
+        origin: {
+          canonicalKey: 'github.com/alice/site',
+          remoteUrl: 'https://github.com/alice/site.git'
+        }
+      },
+      hostId: 'local',
+      path: existing.path,
+      kind: 'git'
+    })
+
+    expect(result).toHaveProperty('project.id', 'github:alice/site')
+  })
+
   it('rolls back a new repo when the supplied identity does not match the project', async () => {
     const added: Record<string, unknown>[] = []
     mockStore.getRepos.mockImplementation(() => added)

@@ -1346,6 +1346,7 @@ import {
 } from '../providers/ssh-git-dispatch'
 import { detectGitHubAvatarIcon, detectRepoIconAndUpstream } from '../repo-icon-autodetect'
 import { enrichMissingRepoGitRemoteIdentities } from '../repo-git-remote-identity-enrichment'
+import { addsCheckoutOrigin } from '../../shared/git-remote-identity'
 import type { ClaudeAccountService } from '../claude-accounts/service'
 import type {
   CodexAccountService,
@@ -23322,8 +23323,8 @@ export class OrcaRuntimeService {
         }
         repo = updated
       } else if (
-        !repo.gitRemoteIdentity &&
         checkoutIdentity &&
+        (!repo.gitRemoteIdentity || addsCheckoutOrigin(repo.gitRemoteIdentity, checkoutIdentity)) &&
         getProjectCheckoutIdentityKey({ gitRemoteIdentity: checkoutIdentity }) === args.projectId
       ) {
         // Why: a checkout-keyed project has no provider identity to stamp — carry its gitRemoteIdentity instead.

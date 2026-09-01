@@ -17,6 +17,7 @@ import {
   getProjectIdentityKey,
   getProjectIdForProviderIdentity
 } from '../../../shared/project-host-setup-projection'
+import { addsCheckoutOrigin } from '../../../shared/git-remote-identity'
 import { getProjectHostSetupForRepo } from '../../../shared/project-host-setup-lookup'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import { prepareLocalWorktreeRootForRepo } from '../../worktree-root-preparation'
@@ -76,8 +77,8 @@ function alignRepoWithRequestedProject(
       }
       repo = updated
     } else if (
-      !repo.gitRemoteIdentity &&
       checkoutIdentity &&
+      (!repo.gitRemoteIdentity || addsCheckoutOrigin(repo.gitRemoteIdentity, checkoutIdentity)) &&
       getProjectCheckoutIdentityKey({ gitRemoteIdentity: checkoutIdentity }) === projectId
     ) {
       // Why: a checkout-keyed project has no provider identity to stamp — carry its gitRemoteIdentity instead.

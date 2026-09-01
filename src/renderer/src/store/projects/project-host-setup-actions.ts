@@ -17,7 +17,7 @@ import type { RepoSlice } from '../repos/repo-state'
 import { ERROR_TOAST_DURATION } from '../repos/repo-state'
 import { repoWithFetchedOwner } from '../repos/owner-routing'
 import { normalizeProjectRow } from '../../../../shared/project-catalog-row-normalization'
-import { redactProjectGitRemoteIdentityForTransfer } from './project-setup-identity-transfer'
+import { negotiateProjectSetupIdentity } from './project-setup-identity-transfer'
 import {
   assertProjectHostSetupMutationRuntimeCapabilities,
   getProjectSetupRuntimeTarget,
@@ -40,20 +40,17 @@ export function createProjectHostSetupActions(
       try {
         const target = getProjectSetupRuntimeTarget(args.hostId)
         await assertProjectHostSetupMutationRuntimeCapabilities(target)
-        const projectProviderIdentity =
-          args.projectProviderIdentity ??
-          get().projects.find((project) => project.id === args.projectId)?.providerIdentity
-        // Why redact: this identity crosses the runtime boundary to another host.
-        const projectGitRemoteIdentity = redactProjectGitRemoteIdentityForTransfer(
-          args.projectGitRemoteIdentity ??
-            get().projects.find((project) => project.id === args.projectId)?.gitRemoteIdentity
-        )
-        // Why: the target host may not have a project record yet; carry the selected source-host identity across the boundary.
-        const setupArgs = {
-          ...args,
-          ...(projectProviderIdentity ? { projectProviderIdentity } : {}),
-          ...(projectGitRemoteIdentity ? { projectGitRemoteIdentity } : {})
-        }
+        const selected = get().projects.find((project) => project.id === args.projectId)
+        // Why negotiated: the target host may not have the project record yet, so the selected
+        // source-host identity travels with the request — but only a host that understands
+        // checkout-keyed ids may be asked for one.
+        const identity = await negotiateProjectSetupIdentity({
+          target,
+          projectId: args.projectId,
+          providerIdentity: args.projectProviderIdentity ?? selected?.providerIdentity,
+          gitRemoteIdentity: args.projectGitRemoteIdentity ?? selected?.gitRemoteIdentity
+        })
+        const setupArgs = { ...args, ...identity }
         const result =
           target.kind === 'local'
             ? await window.api.projects.setupExistingFolder(setupArgs)

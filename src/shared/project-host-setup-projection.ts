@@ -125,8 +125,15 @@ const HOST_LOCAL_PROJECT_ID_PREFIX = 'repo:'
  * it descends from. Null when no remote identity has settled, and for the resolved "no usable
  * remote" marker.
  */
+/** Same provider server, ignoring the port: an API endpoint and a transport URL differ there. */
+function sameProviderServer(left: string | undefined, right: string | undefined): boolean {
+  const hostname = (host: string | undefined): string =>
+    (host ?? 'github.com').trim().toLowerCase().replace(/:\d+$/, '')
+  return hostname(left) === hostname(right)
+}
+
 export function getProjectCheckoutIdentityKey(
-  repo: Pick<Repo, 'gitRemoteIdentity'>
+  repo: Pick<Repo, 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string | null {
   const identity = repo.gitRemoteIdentity
   if (!identity) {
@@ -150,7 +157,15 @@ export function getProjectCheckoutIdentityKey(
   const providerIdentity =
     parseGitHubRemoteUrl(checkout.remoteUrl) ?? parseGitHubCanonicalKey(checkout.canonicalKey)
   if (providerIdentity) {
-    return getProjectIdForProviderIdentity(providerIdentity)
+    // Why the ancestor's host wins: upstream/icon metadata names the provider's API endpoint, port
+    // and all, while a checkout remote carries only its transport host — one GHES repository would
+    // otherwise key differently from an SSH clone than from an HTTPS one.
+    const providerHost = getProjectProviderIdentity(repo)?.host
+    return getProjectIdForProviderIdentity(
+      providerHost && sameProviderServer(providerHost, providerIdentity.host)
+        ? { ...providerIdentity, host: providerHost }
+        : providerIdentity
+    )
   }
   return checkout.canonicalKey ? `git:${checkout.canonicalKey}` : null
 }

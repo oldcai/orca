@@ -153,6 +153,22 @@ export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | nul
   }
 }
 
+/**
+ * True when `carried` is the same remote as `existing` plus the checkout origin `existing`
+ * predates — the shape a row written before the origin field existed has until its next probe.
+ */
+export function addsCheckoutOrigin(
+  existing: GitRemoteIdentity | null | undefined,
+  carried: GitRemoteIdentity
+): boolean {
+  return (
+    !!existing &&
+    !existing.origin &&
+    !!carried.origin &&
+    existing.canonicalKey === carried.canonicalKey
+  )
+}
+
 /** The remote that says which repo this checkout *is*, as opposed to which repo it descends from. */
 export function getCheckoutRemote(identity: GitRemoteIdentity): {
   canonicalKey: string
