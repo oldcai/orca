@@ -44,14 +44,17 @@ export function redactProjectGitRemoteIdentityForTransfer(
   }
 }
 
+export const CHECKOUT_IDENTITY_HOST_UPDATE_REQUIRED_MESSAGE =
+  'The selected Orca server is too old to set this project up: it identifies a checkout by the repository it was forked or generated from. Update Orca on the server and try again.'
+
 /**
- * The identity a setup request should carry to `target`, and the project id to ask it for.
+ * The identity a setup request should carry to `target`.
  *
  * A host that predates `project-host-setup.checkout-identity.v1` aligns an existing folder only
- * through the provider identity, and drops the unknown checkout field. Asking it for a project id
- * derived from the checkout's own remote would make it reject every fork or template setup, so ask
- * such a host for the ancestor-derived id instead — exactly what it received before checkout keying
- * existed. The two ids converge again once that host's own identity probe resolves.
+ * through the provider identity and drops the unknown checkout field, so it cannot honour a project
+ * id derived from the checkout's own remote. Substituting the ancestor-derived id would "succeed"
+ * by adding the host to the fork parent or template instead of the project the user picked, so this
+ * refuses instead — and only for the fork/template projects whose ids actually differ.
  */
 export async function negotiateProjectSetupIdentity(input: {
   target: RuntimeClientTarget
@@ -66,24 +69,24 @@ export async function negotiateProjectSetupIdentity(input: {
   const projectGitRemoteIdentity = redactProjectGitRemoteIdentityForTransfer(
     input.gitRemoteIdentity
   )
-  const carriesCheckoutIdentity =
-    input.target.kind !== 'environment' ||
-    (await runtimeEnvironmentSupportsCapability(
+  const ancestorId = input.providerIdentity
+    ? getProjectIdForProviderIdentity(input.providerIdentity)
+    : undefined
+  const needsCheckoutIdentity = input.projectId !== ancestorId
+  if (
+    needsCheckoutIdentity &&
+    input.target.kind === 'environment' &&
+    !(await runtimeEnvironmentSupportsCapability(
       input.target.environmentId,
       PROJECT_HOST_SETUP_CHECKOUT_IDENTITY_RUNTIME_CAPABILITY,
       15_000
     ))
-  if (carriesCheckoutIdentity) {
-    return {
-      projectId: input.projectId,
-      ...(input.providerIdentity ? { projectProviderIdentity: input.providerIdentity } : {}),
-      ...(projectGitRemoteIdentity ? { projectGitRemoteIdentity } : {})
-    }
+  ) {
+    throw new Error(CHECKOUT_IDENTITY_HOST_UPDATE_REQUIRED_MESSAGE)
   }
   return {
-    projectId: input.providerIdentity
-      ? getProjectIdForProviderIdentity(input.providerIdentity)
-      : input.projectId,
-    ...(input.providerIdentity ? { projectProviderIdentity: input.providerIdentity } : {})
+    projectId: input.projectId,
+    ...(input.providerIdentity ? { projectProviderIdentity: input.providerIdentity } : {}),
+    ...(projectGitRemoteIdentity ? { projectGitRemoteIdentity } : {})
   }
 }

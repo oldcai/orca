@@ -170,6 +170,29 @@ export function getProjectCheckoutIdentityKey(
   return checkout.canonicalKey ? `git:${checkout.canonicalKey}` : null
 }
 
+/**
+ * The checkout key for an identity that travelled with a request, host-qualified by the provider
+ * identity that travelled with it — a GHES project id carries the API port, which a checkout URL
+ * alone cannot reconstruct.
+ */
+export function getCarriedCheckoutIdentityKey(
+  gitRemoteIdentity: NonNullable<Repo['gitRemoteIdentity']>,
+  providerIdentity: ProjectProviderIdentity | undefined
+): string | null {
+  return getProjectCheckoutIdentityKey({
+    gitRemoteIdentity,
+    ...(providerIdentity
+      ? {
+          upstream: {
+            owner: providerIdentity.owner,
+            repo: providerIdentity.repo,
+            ...(providerIdentity.host ? { host: providerIdentity.host } : {})
+          }
+        }
+      : {})
+  })
+}
+
 export function getProjectIdentityKey(
   repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string {

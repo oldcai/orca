@@ -604,7 +604,7 @@ import {
   worktreeIdsEqual
 } from '../../shared/worktree/id'
 import {
-  getProjectCheckoutIdentityKey,
+  getCarriedCheckoutIdentityKey,
   getProjectIdentityKey,
   getProjectIdForProviderIdentity
 } from '../../shared/project-host-setup-projection'
@@ -23325,11 +23325,21 @@ export class OrcaRuntimeService {
       } else if (
         checkoutIdentity &&
         (!repo.gitRemoteIdentity || addsCheckoutOrigin(repo.gitRemoteIdentity, checkoutIdentity)) &&
-        getProjectCheckoutIdentityKey({ gitRemoteIdentity: checkoutIdentity }) === args.projectId
+        getCarriedCheckoutIdentityKey(checkoutIdentity, identity) === args.projectId
       ) {
-        // Why: a checkout-keyed project has no provider identity to stamp — carry its gitRemoteIdentity instead.
+        // Why both: the checkout remote is what keys the project, and the ancestor metadata is what
+        // qualifies a GHES id with its API port — the recheck below re-derives from the stored row.
         const updated = this.store.updateRepo(repo.id, {
-          gitRemoteIdentity: checkoutIdentity
+          gitRemoteIdentity: checkoutIdentity,
+          ...(identity
+            ? {
+                upstream: {
+                  owner: identity.owner,
+                  repo: identity.repo,
+                  ...(identity.host ? { host: identity.host } : {})
+                }
+              }
+            : {})
         })
         if (!updated) {
           throw new Error(`Project setup repo disappeared before it could be linked: ${repo.id}`)

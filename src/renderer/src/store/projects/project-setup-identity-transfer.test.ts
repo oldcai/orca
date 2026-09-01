@@ -112,30 +112,26 @@ describe('negotiateProjectSetupIdentity', () => {
     })
   })
 
-  it('asks an older runtime host for the ancestor-derived id it can still align', async () => {
-    supportsCapability.mockResolvedValue(false)
-
-    const negotiated = await negotiateProjectSetupIdentity({
-      target: { kind: 'environment', environmentId: 'gpu-vm' },
-      ...templateProject
-    })
-
-    expect(negotiated).toEqual({
-      projectId: 'github:templatehq/site-template',
-      projectProviderIdentity: templateProject.providerIdentity
-    })
-  })
-
-  it('keeps the requested id for an older host when there is no provider identity to fall back to', async () => {
+  it('refuses an older runtime host instead of adding it to the ancestor project', async () => {
     supportsCapability.mockResolvedValue(false)
 
     await expect(
       negotiateProjectSetupIdentity({
         target: { kind: 'environment', environmentId: 'gpu-vm' },
-        projectId: 'git:gitlab.com/alice/app',
-        providerIdentity: undefined,
+        ...templateProject
+      })
+    ).rejects.toThrow(/too old to set this project up/)
+  })
+
+  it('does not consult the capability when the checkout and ancestor ids agree', async () => {
+    await expect(
+      negotiateProjectSetupIdentity({
+        target: { kind: 'environment', environmentId: 'gpu-vm' },
+        projectId: 'github:alice/app',
+        providerIdentity: { provider: 'github', owner: 'alice', repo: 'app' },
         gitRemoteIdentity: undefined
       })
-    ).resolves.toEqual({ projectId: 'git:gitlab.com/alice/app' })
+    ).resolves.toMatchObject({ projectId: 'github:alice/app' })
+    expect(supportsCapability).not.toHaveBeenCalled()
   })
 })
