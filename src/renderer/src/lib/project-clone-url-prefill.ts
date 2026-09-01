@@ -1,4 +1,5 @@
 import { stripCredentialsFromMessage } from '../../../shared/git-remote-error'
+import { getCheckoutRemote } from '../../../shared/git-remote-identity'
 import type { Project } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
 
@@ -23,7 +24,10 @@ export function resolveProjectCloneUrlPrefill(
   const sourceRepoIds =
     projects.find((candidate) => candidate.id === selectedProjectId)?.sourceRepoIds ?? []
   const remoteUrl = sourceRepoIds
-    .map((sourceId) => repos.find((repo) => repo.id === sourceId)?.gitRemoteIdentity?.remoteUrl)
+    .map((sourceId) => {
+      const identity = repos.find((repo) => repo.id === sourceId)?.gitRemoteIdentity
+      return identity ? getCheckoutRemote(identity).remoteUrl : undefined
+    })
     .find((url): url is string => Boolean(url))
   return remoteUrl ? stripCredentialsFromMessage(remoteUrl) : ''
 }

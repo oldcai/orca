@@ -461,6 +461,42 @@ describe('project host setup projection', () => {
     ])
   })
 
+  it('ignores an unresolved SSH host alias so the id cannot vary per machine', () => {
+    const projection = projectHostSetupProjectionFromRepos([
+      repo({
+        id: 'aliased',
+        path: '/Users/alice/app',
+        displayName: 'app',
+        upstream: { owner: 'acme', repo: 'app', host: 'github.com' },
+        gitRemoteIdentity: {
+          // Why: only ~/.ssh/config expands `github-work`, so the literal alias is machine-local.
+          canonicalKey: 'github-work/acme/app',
+          remoteName: 'origin',
+          remoteUrl: 'git@github-work:acme/app.git'
+        }
+      })
+    ])
+
+    expect(projection.projects.map((project) => project.id)).toEqual(['github:acme/app'])
+  })
+
+  it('falls back instead of throwing when a persisted identity row is malformed', () => {
+    const projection = projectHostSetupProjectionFromRepos([
+      repo({
+        id: 'malformed',
+        path: '/Users/alice/app',
+        displayName: 'app',
+        upstream: { owner: 'acme', repo: 'app', host: 'github.com' },
+        // Why cast: this shape is what a persisted row or an older peer can actually deliver.
+        gitRemoteIdentity: { canonicalKey: 42, remoteName: 'origin' } as unknown as NonNullable<
+          Repo['gitRemoteIdentity']
+        >
+      })
+    ])
+
+    expect(projection.projects.map((project) => project.id)).toEqual(['github:acme/app'])
+  })
+
   it('keys a fork checkout on its own origin instead of the fork parent', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({

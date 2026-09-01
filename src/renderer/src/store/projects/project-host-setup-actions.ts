@@ -17,6 +17,7 @@ import type { RepoSlice } from '../repos/repo-state'
 import { ERROR_TOAST_DURATION } from '../repos/repo-state'
 import { repoWithFetchedOwner } from '../repos/owner-routing'
 import { normalizeProjectRow } from '../../../../shared/project-catalog-row-normalization'
+import { redactProjectGitRemoteIdentityForTransfer } from './project-setup-identity-transfer'
 import {
   assertProjectHostSetupMutationRuntimeCapabilities,
   getProjectSetupRuntimeTarget,
@@ -42,8 +43,17 @@ export function createProjectHostSetupActions(
         const projectProviderIdentity =
           args.projectProviderIdentity ??
           get().projects.find((project) => project.id === args.projectId)?.providerIdentity
+        // Why redact: this identity crosses the runtime boundary to another host.
+        const projectGitRemoteIdentity = redactProjectGitRemoteIdentityForTransfer(
+          args.projectGitRemoteIdentity ??
+            get().projects.find((project) => project.id === args.projectId)?.gitRemoteIdentity
+        )
         // Why: the target host may not have a project record yet; carry the selected source-host identity across the boundary.
-        const setupArgs = projectProviderIdentity ? { ...args, projectProviderIdentity } : args
+        const setupArgs = {
+          ...args,
+          ...(projectProviderIdentity ? { projectProviderIdentity } : {}),
+          ...(projectGitRemoteIdentity ? { projectGitRemoteIdentity } : {})
+        }
         const result =
           target.kind === 'local'
             ? await window.api.projects.setupExistingFolder(setupArgs)

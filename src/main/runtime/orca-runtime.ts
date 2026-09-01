@@ -603,7 +603,11 @@ import {
   worktreeIdComparisonKey,
   worktreeIdsEqual
 } from '../../shared/worktree/id'
-import { getProjectIdForProviderIdentity } from '../../shared/project-host-setup-projection'
+import {
+  getProjectCheckoutIdentityKey,
+  getProjectIdentityKey,
+  getProjectIdForProviderIdentity
+} from '../../shared/project-host-setup-projection'
 import {
   getProjectHostSetupForRepo,
   getProjectHostSetupWorktreeMeta
@@ -23298,21 +23302,45 @@ export class OrcaRuntimeService {
       const existingProject = this.listProjects().find((project) => project.id === args.projectId)
       // Why: the selected project can exist only on the source host, so its structured identity travels with the request.
       const identity = existingProject?.providerIdentity ?? args.projectProviderIdentity
-      if (!identity || getProjectIdForProviderIdentity(identity) !== args.projectId) {
-        throw new Error('Imported folder does not match the selected project identity.')
-      }
-      const updated = this.store.updateRepo(repo.id, {
-        upstream: {
+      // Why: mirrors `identity` above for checkout-keyed projects, which have no provider identity —
+      // the target host may not have the project record yet, so the request's copy is the only source.
+      const checkoutIdentity = existingProject?.gitRemoteIdentity ?? args.projectGitRemoteIdentity
+      if (identity && getProjectIdForProviderIdentity(identity) === args.projectId) {
+        const upstream = {
           owner: identity.owner,
           repo: identity.repo,
           ...(identity.host ? { host: identity.host } : {})
         }
-      })
-      if (!updated) {
-        throw new Error(`Project setup repo disappeared before it could be linked: ${repo.id}`)
+        // Why re-check before writing: a stale gitRemoteIdentity on the repo outranks upstream in
+        // getProjectIdentityKey, so stamping first could leave a mismatched upstream behind on throw.
+        if (getProjectIdentityKey({ ...repo, upstream }) !== args.projectId) {
+          throw new Error('Imported folder does not match the selected project identity.')
+        }
+        const updated = this.store.updateRepo(repo.id, { upstream })
+        if (!updated) {
+          throw new Error(`Project setup repo disappeared before it could be linked: ${repo.id}`)
+        }
+        repo = updated
+      } else if (
+        !repo.gitRemoteIdentity &&
+        checkoutIdentity &&
+        getProjectCheckoutIdentityKey({ gitRemoteIdentity: checkoutIdentity }) === args.projectId
+      ) {
+        // Why: a checkout-keyed project has no provider identity to stamp — carry its gitRemoteIdentity instead.
+        const updated = this.store.updateRepo(repo.id, {
+          gitRemoteIdentity: checkoutIdentity
+        })
+        if (!updated) {
+          throw new Error(`Project setup repo disappeared before it could be linked: ${repo.id}`)
+        }
+        repo = updated
+      } else {
+        throw new Error('Imported folder does not match the selected project identity.')
       }
-      repo = updated
       setup = getProjectHostSetupForRepo(this.listProjectHostSetups(), repo)
+      if (getProjectIdentityKey(repo) !== args.projectId) {
+        throw new Error('Imported folder does not match the selected project identity.')
+      }
     }
     const setupMethod = args.setupMethod ?? 'imported-existing-folder'
     const updated = this.store.updateRepo(repo.id, { projectHostSetupMethod: setupMethod })

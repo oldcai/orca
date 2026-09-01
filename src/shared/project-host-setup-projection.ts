@@ -3,7 +3,8 @@ import {
   normalizeProjectHostSetupRow,
   normalizeProjectRow
 } from './project-catalog-row-normalization'
-import { getCheckoutRemote } from './git-remote-identity'
+import { getCheckoutRemote, splitGitRemoteKey } from './git-remote-identity'
+import { isUnresolvedSshHostAlias } from './git-remote-host-alias'
 import { githubRepoIdentityKey, isDefaultGitHubHost } from './github/repository-identity-key'
 import {
   parseGitHubCanonicalKey,
@@ -72,14 +73,22 @@ function getProjectGitRemoteIdentity(
     typeof identity?.canonicalKey === 'string' ? identity.canonicalKey.trim() : ''
   const remoteName = typeof identity?.remoteName === 'string' ? identity.remoteName.trim() : ''
   const remoteUrl = typeof identity?.remoteUrl === 'string' ? identity.remoteUrl.trim() : ''
+  const originCanonicalKey =
+    typeof identity?.origin?.canonicalKey === 'string' ? identity.origin.canonicalKey.trim() : ''
+  const originRemoteUrl =
+    typeof identity?.origin?.remoteUrl === 'string' ? identity.origin.remoteUrl.trim() : ''
   return canonicalKey && remoteName && remoteUrl
     ? // Why carry `origin`: the project row is the repo's identity, and a copy that drops the
       // checkout remote would read as "this project is its template" to any later consumer.
+      // Re-validated like the sibling fields: this object is persisted and exchanged with
+      // remote Orca hosts running a different version, so a promised string can arrive malformed.
       {
         canonicalKey,
         remoteName,
         remoteUrl,
-        ...(identity?.origin ? { origin: identity.origin } : {})
+        ...(originCanonicalKey && originRemoteUrl
+          ? { origin: { canonicalKey: originCanonicalKey, remoteUrl: originRemoteUrl } }
+          : {})
       }
     : null
 }
@@ -113,14 +122,29 @@ const HOST_LOCAL_PROJECT_ID_PREFIX = 'repo:'
 
 /**
  * The repo this checkout *is*, as a project id — its own remote, never the fork parent or template
- * it descends from. Null while no remote identity has been probed yet.
+ * it descends from. Null when no remote identity has settled, and for the resolved "no usable
+ * remote" marker.
  */
-function getProjectCheckoutIdentityKey(repo: Pick<Repo, 'gitRemoteIdentity'>): string | null {
+export function getProjectCheckoutIdentityKey(
+  repo: Pick<Repo, 'gitRemoteIdentity'>
+): string | null {
   const identity = repo.gitRemoteIdentity
   if (!identity) {
     return null
   }
-  const checkout = getCheckoutRemote(identity)
+  const raw = getCheckoutRemote(identity)
+  // Why re-typed here too: repo rows arrive from persisted JSON and from hosts on other versions,
+  // so a declared string can be missing or malformed by the time it reaches this key.
+  const checkout = {
+    canonicalKey: typeof raw.canonicalKey === 'string' ? raw.canonicalKey.trim() : '',
+    remoteUrl: typeof raw.remoteUrl === 'string' ? raw.remoteUrl.trim() : ''
+  }
+  // Why bail on an unresolved SSH alias: only ~/.ssh/config can expand it, so keying on the
+  // literal alias would mint a different project id per machine for the same remote.
+  const hostParts = splitGitRemoteKey(checkout.canonicalKey, (host) => host)
+  if (hostParts && isUnresolvedSshHostAlias(hostParts.host)) {
+    return null
+  }
   // Why the same parse order and namespaces as the provider path: a checkout-keyed row must still
   // merge with the hosts whose rows resolved their identity through `upstream` metadata alone.
   const providerIdentity =
@@ -128,8 +152,7 @@ function getProjectCheckoutIdentityKey(repo: Pick<Repo, 'gitRemoteIdentity'>): s
   if (providerIdentity) {
     return getProjectIdForProviderIdentity(providerIdentity)
   }
-  const canonicalKey = checkout.canonicalKey.trim()
-  return canonicalKey ? `git:${canonicalKey}` : null
+  return checkout.canonicalKey ? `git:${checkout.canonicalKey}` : null
 }
 
 export function getProjectIdentityKey(

@@ -328,6 +328,56 @@ describe('repos:add + repos:clone', () => {
     expect(result).toHaveProperty('project.id', 'github:github.acme.test/acme/orca')
   })
 
+  it('links a folder into a checkout-keyed project with the carried git remote identity', async () => {
+    const added: Record<string, unknown>[] = []
+    mockStore.getRepos.mockImplementation(() => added)
+    mockStore.addRepo.mockImplementation((repo: Record<string, unknown>) => added.push(repo))
+    mockStore.updateRepo.mockImplementation((id, updates) => {
+      const repo = added.find((entry) => entry.id === id)
+      if (!repo) {
+        return null
+      }
+      Object.assign(repo, updates)
+      return { ...repo }
+    })
+    // Why derived from the repo: the target host has no record of the project until the identity is
+    // stamped, so the request's copy is the only source the align step can use.
+    mockStore.getProjects.mockImplementation(() => {
+      const repo = added.find((entry) => 'gitRemoteIdentity' in entry)
+      return repo
+        ? [
+            {
+              id: 'github:alice/site',
+              displayName: 'site',
+              gitRemoteIdentity: repo.gitRemoteIdentity
+            }
+          ]
+        : []
+    })
+
+    const result = await handlers.get('projectHostSetups:setupExistingFolder')!(null, {
+      projectId: 'github:alice/site',
+      projectGitRemoteIdentity: {
+        canonicalKey: 'github.com/TemplateHQ/site-template',
+        remoteName: 'upstream',
+        remoteUrl: 'https://github.com/TemplateHQ/site-template.git',
+        origin: {
+          canonicalKey: 'github.com/alice/site',
+          remoteUrl: 'https://github.com/alice/site.git'
+        }
+      },
+      hostId: 'local',
+      path: '/tmp/site-src',
+      kind: 'git'
+    })
+
+    expect(added[0]?.gitRemoteIdentity).toMatchObject({
+      origin: { canonicalKey: 'github.com/alice/site' }
+    })
+    expect(result).toHaveProperty('project.id', 'github:alice/site')
+    expect(mockStore.removeProject).not.toHaveBeenCalled()
+  })
+
   it('rolls back a new repo when the supplied identity does not match the project', async () => {
     const added: Record<string, unknown>[] = []
     mockStore.getRepos.mockImplementation(() => added)
