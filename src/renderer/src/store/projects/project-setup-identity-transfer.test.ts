@@ -123,6 +123,59 @@ describe('negotiateProjectSetupIdentity', () => {
     ).rejects.toThrow(/too old to set this project up/)
   })
 
+  it('does not refuse an older host for a plain non-GitHub repo, whose id did not change', async () => {
+    supportsCapability.mockResolvedValue(false)
+
+    await expect(
+      negotiateProjectSetupIdentity({
+        target: { kind: 'environment', environmentId: 'gpu-vm' },
+        projectId: 'git:gitlab.com/alice/app',
+        providerIdentity: undefined,
+        gitRemoteIdentity: {
+          canonicalKey: 'gitlab.com/alice/app',
+          remoteName: 'origin',
+          remoteUrl: 'git@gitlab.com:alice/app.git'
+        }
+      })
+    ).resolves.toMatchObject({ projectId: 'git:gitlab.com/alice/app' })
+    expect(supportsCapability).not.toHaveBeenCalled()
+  })
+
+  it('does not refuse an older host for a folder project, which keys by repo id on both sides', async () => {
+    supportsCapability.mockResolvedValue(false)
+
+    await expect(
+      negotiateProjectSetupIdentity({
+        target: { kind: 'environment', environmentId: 'gpu-vm' },
+        projectId: 'repo:folder-1',
+        providerIdentity: undefined,
+        gitRemoteIdentity: undefined
+      })
+    ).resolves.toEqual({ projectId: 'repo:folder-1' })
+    expect(supportsCapability).not.toHaveBeenCalled()
+  })
+
+  it('refuses an older host for a non-GitHub fork, whose old id named the upstream remote', async () => {
+    supportsCapability.mockResolvedValue(false)
+
+    await expect(
+      negotiateProjectSetupIdentity({
+        target: { kind: 'environment', environmentId: 'gpu-vm' },
+        projectId: 'git:gitlab.com/alice/app',
+        providerIdentity: undefined,
+        gitRemoteIdentity: {
+          canonicalKey: 'gitlab.com/team/app',
+          remoteName: 'upstream',
+          remoteUrl: 'git@gitlab.com:team/app.git',
+          origin: {
+            canonicalKey: 'gitlab.com/alice/app',
+            remoteUrl: 'git@gitlab.com:alice/app.git'
+          }
+        }
+      })
+    ).rejects.toThrow(/too old to set this project up/)
+  })
+
   it('does not consult the capability when the checkout and ancestor ids agree', async () => {
     await expect(
       negotiateProjectSetupIdentity({

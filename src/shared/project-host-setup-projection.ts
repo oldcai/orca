@@ -193,24 +193,32 @@ export function getCarriedCheckoutIdentityKey(
   })
 }
 
-export function getProjectIdentityKey(
-  repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
-): string {
-  // Why first: `upstream` and the avatar icon below name the fork/template ancestor, which every
-  // sibling checkout shares — keying on it collapsed unrelated projects into one.
-  const checkoutKey = getProjectCheckoutIdentityKey(repo)
-  if (checkoutKey) {
-    return checkoutKey
-  }
+/**
+ * The project id derived before checkout keying existed, and still derived by hosts that predate
+ * it: the fork/template ancestor when one is known, else the selected remote. Null when the row
+ * has no remote identity at all (those fall through to the host-local `repo:<id>` on both sides).
+ */
+export function getAncestorProjectIdentityKey(
+  repo: Pick<Repo, 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
+): string | null {
   const identity = getProjectProviderIdentity(repo)
   if (identity) {
     return getProjectIdForProviderIdentity(identity)
   }
   const gitRemoteIdentity = getProjectGitRemoteIdentity(repo)
-  if (gitRemoteIdentity) {
-    return `git:${gitRemoteIdentity.canonicalKey}`
-  }
-  return `${HOST_LOCAL_PROJECT_ID_PREFIX}${repo.id}`
+  return gitRemoteIdentity ? `git:${gitRemoteIdentity.canonicalKey}` : null
+}
+
+export function getProjectIdentityKey(
+  repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
+): string {
+  // Why first: `upstream` and the avatar icon name the fork/template ancestor, which every sibling
+  // checkout shares — keying on it collapsed unrelated projects into one.
+  return (
+    getProjectCheckoutIdentityKey(repo) ??
+    getAncestorProjectIdentityKey(repo) ??
+    `${HOST_LOCAL_PROJECT_ID_PREFIX}${repo.id}`
+  )
 }
 
 /**

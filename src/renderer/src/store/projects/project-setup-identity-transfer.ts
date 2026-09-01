@@ -1,6 +1,6 @@
 import { stripCredentialsFromMessage } from '../../../../shared/git-remote-error'
 import type { GitRemoteIdentity } from '../../../../shared/git-remote-identity'
-import { getProjectIdForProviderIdentity } from '../../../../shared/project-host-setup-projection'
+import { getAncestorProjectIdentityKey } from '../../../../shared/project-host-setup-projection'
 import type { ProjectProviderIdentity } from '../../../../shared/project-types'
 import { PROJECT_HOST_SETUP_CHECKOUT_IDENTITY_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import {
@@ -69,10 +69,21 @@ export async function negotiateProjectSetupIdentity(input: {
   const projectGitRemoteIdentity = redactProjectGitRemoteIdentityForTransfer(
     input.gitRemoteIdentity
   )
-  const ancestorId = input.providerIdentity
-    ? getProjectIdForProviderIdentity(input.providerIdentity)
-    : undefined
-  const needsCheckoutIdentity = input.projectId !== ancestorId
+  // Why compare with the id the old host derives, not with "has a provider identity": a plain
+  // GitLab repo or a folder project keys identically on both sides and must not be refused.
+  const ancestorId = getAncestorProjectIdentityKey({
+    ...(input.providerIdentity
+      ? {
+          upstream: {
+            owner: input.providerIdentity.owner,
+            repo: input.providerIdentity.repo,
+            ...(input.providerIdentity.host ? { host: input.providerIdentity.host } : {})
+          }
+        }
+      : {}),
+    gitRemoteIdentity: input.gitRemoteIdentity
+  })
+  const needsCheckoutIdentity = ancestorId !== null && ancestorId !== input.projectId
   if (
     needsCheckoutIdentity &&
     input.target.kind === 'environment' &&
