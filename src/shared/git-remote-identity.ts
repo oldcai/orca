@@ -6,8 +6,8 @@ export type GitRemoteIdentity = {
   remoteUrl: string
   /**
    * The checkout's own `origin`, recorded only when the pick above is a different remote (a fork
-   * parent, or the template a site was generated from). Project identity keys on this: the
-   * ancestor names where PRs and issues live, not which checkout this is.
+   * parent, or the template a site was generated from). `getProjectIdentityKey` keys the project
+   * on this origin; the remote picked above only says where PRs and issues live.
    */
   origin?: { canonicalKey: string; remoteUrl: string }
 }
