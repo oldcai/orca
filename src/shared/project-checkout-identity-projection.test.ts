@@ -122,6 +122,39 @@ describe('project identity from the checkout remote', () => {
     ])
   })
 
+  it('keeps an HTTPS checkout on its own endpoint port when the metadata names another', () => {
+    const projection = projectHostSetupProjectionFromRepos([
+      repo({
+        id: 'other-endpoint',
+        path: '/Users/alice/app',
+        displayName: 'app',
+        upstream: { owner: 'acme', repo: 'app', host: 'github.acme.test:8443' },
+        gitRemoteIdentity: {
+          canonicalKey: 'github.acme.test/acme/app',
+          remoteName: 'origin',
+          // Why: an HTTP(S) port names the API endpoint, so this is a different server than :8443.
+          remoteUrl: 'https://github.acme.test:9443/acme/app.git'
+        }
+      }),
+      repo({
+        id: 'default-port-metadata',
+        path: '/Users/alice/app-2',
+        displayName: 'app-2',
+        upstream: { owner: 'acme', repo: 'app-2', host: 'github.acme.test' },
+        gitRemoteIdentity: {
+          canonicalKey: 'github.acme.test/acme/app-2',
+          remoteName: 'origin',
+          remoteUrl: 'https://github.acme.test:8443/acme/app-2.git'
+        }
+      })
+    ])
+
+    expect(projection.projects.map((project) => project.id)).toEqual([
+      'github:github.acme.test:9443/acme/app',
+      'github:github.acme.test:8443/acme/app-2'
+    ])
+  })
+
   it('ignores an unresolved SSH host alias so the id cannot vary per machine', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({

@@ -121,14 +121,26 @@ export function isProjectRemoteIdentityPending(
 
 const HOST_LOCAL_PROJECT_ID_PREFIX = 'repo:'
 
-/** A provider host without its port, an absent host meaning github.com. */
-function providerHostname(host: string | undefined): string {
-  return (host ?? 'github.com').trim().toLowerCase().replace(/:\d+$/, '')
+/** A provider host as its lowercase hostname and the port it names, if any; absent means github.com. */
+function providerHostParts(host: string | undefined): { hostname: string; port: string | null } {
+  const trimmed = (host ?? 'github.com').trim().toLowerCase()
+  const match = trimmed.match(/^(.*?)(?::(\d+))?$/)
+  return { hostname: match?.[1] ?? trimmed, port: match?.[2] ?? null }
 }
 
-/** Same provider server, ignoring the port: an API endpoint and a transport URL differ there. */
-function sameProviderServer(left: string | undefined, right: string | undefined): boolean {
-  return providerHostname(left) === providerHostname(right)
+/**
+ * Whether a checkout's host names the same provider endpoint as the metadata's. A checkout host
+ * carries a port only when it came from an HTTP(S) URL, where the port identifies the API endpoint,
+ * so then the ports must agree as well; an SSH clone or a canonical key carries no port (transport
+ * ports are dropped upstream), and only the hostname can be compared.
+ */
+function sameProviderEndpoint(metadataHost: string, checkoutHost: string | undefined): boolean {
+  const metadata = providerHostParts(metadataHost)
+  const checkout = providerHostParts(checkoutHost)
+  if (metadata.hostname !== checkout.hostname) {
+    return false
+  }
+  return checkout.port === null || checkout.port === metadata.port
 }
 
 /**
@@ -166,7 +178,7 @@ export function getProjectCheckoutIdentityKey(
     // otherwise key differently from an SSH clone than from an HTTPS one.
     const providerHost = getProjectProviderIdentity(repo)?.host
     return getProjectIdForProviderIdentity(
-      providerHost && sameProviderServer(providerHost, providerIdentity.host)
+      providerHost && sameProviderEndpoint(providerHost, providerIdentity.host)
         ? { ...providerIdentity, host: providerHost }
         : providerIdentity
     )
