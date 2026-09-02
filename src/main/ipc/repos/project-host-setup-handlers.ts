@@ -34,6 +34,10 @@ import {
 import { addLocalRepoFromPath } from './local-repo-registration'
 import { addRemoteRepoFromPath } from './remote-repo-registration'
 
+/**
+ * The IPC reply for a registered repo. A setup whose project row is missing is a store invariant
+ * breach, so it throws instead of replying with a half-built result.
+ */
 function buildProjectHostSetupResult(store: Store, repo: Repo): ProjectHostSetupResult {
   const setup = getProjectHostSetupForRepo(store.getProjectHostSetups(), repo)
   const project = store.getProjects().find((entry) => entry.id === setup.projectId)

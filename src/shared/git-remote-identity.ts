@@ -97,6 +97,7 @@ export function normalizeGitRemoteUrl(remoteUrl: string): string | null {
   }
 }
 
+/** One entry per remote, from its `(fetch)` line of `git remote -v`; push lines are skipped. */
 export function parseGitRemoteVerboseOutput(stdout: string): GitRemoteEntry[] {
   const entries: GitRemoteEntry[] = []
   for (const rawLine of stdout.split(/\r?\n/)) {
@@ -117,6 +118,7 @@ export function parseGitRemoteVerboseOutput(stdout: string): GitRemoteEntry[] {
   return entries
 }
 
+/** Rank when choosing the identity remote: `upstream`, then `origin`, then the rest by name. */
 function primaryRemoteSortKey(entry: GitRemoteEntry): number {
   if (entry.name === 'upstream') {
     return 0

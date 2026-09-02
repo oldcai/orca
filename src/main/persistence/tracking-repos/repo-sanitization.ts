@@ -8,6 +8,10 @@ import {
   normalizeWorktreeVisibilitySourcePreferences
 } from '../../../shared/worktree/visibility-sources'
 
+/**
+ * Rebuilds `upstream` from untrusted JSON: `null` stays the settled "no fork parent" marker, a row
+ * missing owner or repo becomes `undefined`, and an absent host stays absent.
+ */
 export function sanitizeRepoUpstream(value: unknown): Repo['upstream'] | undefined {
   if (value === undefined) {
     return undefined
@@ -82,6 +86,7 @@ function sanitizeCheckoutOriginRemote(
   return canonicalKey && remoteUrl ? { canonicalKey, remoteUrl } : undefined
 }
 
+/** Keeps only a known setup method; anything else becomes `undefined`, not a stray string. */
 export function sanitizeRepoProjectHostSetupMethod(
   value: unknown
 ): RepoProjectHostSetupMethod | undefined {

@@ -43,10 +43,15 @@ function getRepoLocationKey(repo: Pick<Repo, 'path' | 'connectionId'>): string {
   return `${repo.connectionId ?? 'local'}\0${repo.path}`
 }
 
+/** The live row for a probed repo: `getRepo` when the store has it, else a scan of the list. */
 function getCurrentRepo(store: RepoIdentityStore, id: string): Repo | undefined {
   return store.getRepo?.(id) ?? store.getRepos().find((repo) => repo.id === id)
 }
 
+/**
+ * Whether the row is still the checkout that was probed: same path and host, and not since turned
+ * into a folder workspace. A probe result must never land on a repo that moved underneath it.
+ */
 function isSameProbedRepo(snapshot: Repo, current: Repo | undefined): current is Repo {
   return (
     !!current &&
@@ -79,6 +84,10 @@ function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentit
   )
 }
 
+/**
+ * Stores a probe result only while the repo is still the one probed and the result is a real
+ * change; returns whether a row was written.
+ */
 function writeIdentity(
   store: RepoIdentityStore,
   snapshot: Repo,

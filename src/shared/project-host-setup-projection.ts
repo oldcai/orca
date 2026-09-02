@@ -250,18 +250,22 @@ export function isHostLocalProjectId(projectId: string): boolean {
   return projectId.startsWith(HOST_LOCAL_PROJECT_ID_PREFIX)
 }
 
+/** The `github:` project id for a provider identity: case folded, github.com left implicit. */
 export function getProjectIdForProviderIdentity(identity: ProjectProviderIdentity): string {
   return `github:${githubRepoIdentityKey(identity)}`
 }
 
+/** The project id a repo row projects into; the projection derives every id through here. */
 function getProjectId(
   repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string {
   return getProjectIdentityKey(repo)
 }
 
-// Why: `addedAt || now` restamps Date.now() when addedAt is 0 / absent / NaN, so every
-// projection looks dirty and reconcileCatalogRows never reuses the project or setup.
+/**
+ * Why not `addedAt || now`: that restamps Date.now() when addedAt is 0 / absent / NaN, so every
+ * projection looks dirty and reconcileCatalogRows never reuses the project or setup.
+ */
 function catalogTimestampFromAddedAt(addedAt: number): number {
   return Number.isFinite(addedAt) ? addedAt : 0
 }
