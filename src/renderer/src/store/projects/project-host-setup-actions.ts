@@ -24,6 +24,10 @@ import {
   setupWithFetchedOwner
 } from './project-host-routing'
 
+/**
+ * Store actions for project host setups. Requests routed to a remote runtime carry the selected
+ * project's identity, negotiated against what that runtime can key by.
+ */
 export function createProjectHostSetupActions(
   set: Parameters<StateCreator<AppState>>[0],
   get: Parameters<StateCreator<AppState>>[1]

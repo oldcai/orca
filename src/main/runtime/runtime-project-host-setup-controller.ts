@@ -155,6 +155,10 @@ export class RuntimeProjectHostSetupController {
     }
   }
 
+  /**
+   * Merges a freshly registered repo into the project the request named — stamping the ancestor
+   * identity or the carried checkout identity — and refuses when no stamp makes the derived id match.
+   */
   private linkRepo(
     args: ProjectHostSetupExistingFolderArgs,
     initialRepo: Repo

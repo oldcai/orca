@@ -8,9 +8,12 @@ import {
   type RuntimeClientTarget
 } from '../../runtime/runtime-rpc-client'
 
+/**
+ * The value as a trimmed string, or empty for anything else: a persisted row, or a peer on another
+ * version, can deliver a non-string where the type promises one, and `.trim()` on it would throw
+ * before any fallback could run.
+ */
 function trimmedString(value: unknown): string {
-  // Why typed here: a persisted row, or a peer on another version, can deliver a non-string where
-  // the type promises one — and `.trim()` on it would throw before any fallback could run.
   return typeof value === 'string' ? value.trim() : ''
 }
 

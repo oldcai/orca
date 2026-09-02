@@ -127,6 +127,10 @@ function primaryRemoteSortKey(entry: GitRemoteEntry): number {
   return 2
 }
 
+/**
+ * The identity for a `git remote -v` listing: `upstream` outranks `origin`, which outranks the
+ * first remote by name — and when a different remote wins, the checkout's own origin rides along.
+ */
 export function deriveGitRemoteIdentity(stdout: string): GitRemoteIdentity | null {
   const entries = parseGitRemoteVerboseOutput(stdout)
     .map((entry) => ({

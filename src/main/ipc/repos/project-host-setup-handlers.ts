@@ -43,6 +43,10 @@ function buildProjectHostSetupResult(store: Store, repo: Repo): ProjectHostSetup
   return { project, setup, repo }
 }
 
+/**
+ * Merges a freshly registered repo into the project the request named — stamping the ancestor
+ * identity or the carried checkout identity — and refuses when no stamp makes the derived id match.
+ */
 function alignRepoWithRequestedProject(
   store: Store,
   repo: Repo,
@@ -117,6 +121,10 @@ function alignRepoWithRequestedProject(
   return buildProjectHostSetupResult(store, repo)
 }
 
+/**
+ * Local-host project setup IPC. A setup request carries the selected project's identity, so a
+ * folder can join a project this host holds no record of yet.
+ */
 export function registerProjectHostSetupHandlers(mainWindow: BrowserWindow, store: Store): void {
   ipcMain.handle(
     'projectHostSetups:create',

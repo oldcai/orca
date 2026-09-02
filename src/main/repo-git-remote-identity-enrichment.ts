@@ -56,6 +56,10 @@ function isSameProbedRepo(snapshot: Repo, current: Repo | undefined): current is
   )
 }
 
+/**
+ * Whether a probe result replaces the stored identity: a resolved identity is never cleared, and
+ * a newly learned checkout origin counts as a change so pre-upgrade rows re-key themselves.
+ */
 function shouldWriteProbedIdentity(current: Repo, probed: Repo['gitRemoteIdentity']): boolean {
   const existing = current.gitRemoteIdentity
   if (!existing) {

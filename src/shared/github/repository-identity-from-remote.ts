@@ -2,6 +2,7 @@ import { normalizeGitHubRemoteHost } from '../git-remote-host-alias'
 import type { ProjectProviderIdentity } from '../project-types'
 import { isDefaultGitHubHost } from './repository-identity-key'
 
+/** Whether a bare host is GitHub or a GHES server; every other git host stays provider-neutral. */
 function isGitHubRemoteHost(host: string): boolean {
   const hostname = host.toLowerCase().replace(/:\d+$/, '')
   // A generic git remote is provider-neutral. Only infer GHES when the host
@@ -15,6 +16,7 @@ function isGitHubRemoteHost(host: string): boolean {
   )
 }
 
+/** A GitHub identity for a parsed remote, carrying the host only off github.com; null for other hosts. */
 function projectProviderIdentity(
   host: string,
   owner: string,
@@ -32,6 +34,7 @@ function projectProviderIdentity(
   }
 }
 
+/** `owner/repo` from a remote path with `.git` stripped; null unless it has exactly two segments. */
 function parseGitHubRemotePath(path: string): { owner: string; repo: string } | null {
   const parts = path.replace(/^\/+/, '').replace(/\/+$/, '').split('/')
   if (parts.length !== 2) {

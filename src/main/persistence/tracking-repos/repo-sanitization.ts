@@ -32,6 +32,10 @@ export function sanitizeRepoUpstream(value: unknown): Repo['upstream'] | undefin
   return host ? { owner, repo, host } : { owner, repo }
 }
 
+/**
+ * Rebuilds a persisted identity from untrusted JSON: `null` stays the settled "no usable remote"
+ * marker, and a row missing a required part becomes `undefined` so the probe runs again.
+ */
 export function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | null | undefined {
   // Why: `null` is a resolved "no usable remote" marker; dropping it would make
   // a settled repo indistinguishable from one whose identity probe is pending.
@@ -64,6 +68,7 @@ export function sanitizeGitRemoteIdentity(value: unknown): GitRemoteIdentity | n
     : undefined
 }
 
+/** A checkout origin only when both of its parts survive as non-empty strings; half an origin is dropped. */
 function sanitizeCheckoutOriginRemote(
   value: unknown
 ): NonNullable<GitRemoteIdentity['origin']> | undefined {

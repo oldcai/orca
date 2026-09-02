@@ -65,6 +65,7 @@ export function getProjectProviderIdentity(
   )
 }
 
+/** The repo's remote identity re-validated field by field, checkout origin included; null when a required part is missing. */
 function getProjectGitRemoteIdentity(
   repo: Pick<Repo, 'gitRemoteIdentity'>
 ): NonNullable<Repo['gitRemoteIdentity']> | null {
