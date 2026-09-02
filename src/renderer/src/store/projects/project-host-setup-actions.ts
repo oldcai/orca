@@ -40,6 +40,10 @@ export function createProjectHostSetupActions(
   | 'setupProjectClone'
 > {
   return {
+    /**
+     * Registers an existing folder on a host as a setup of the selected project. The request
+     * carries the project's identity, negotiated against what the target runtime can key by.
+     */
     setupProjectExistingFolder: async (args) => {
       try {
         const target = getProjectSetupRuntimeTarget(args.hostId)

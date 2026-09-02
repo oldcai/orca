@@ -121,11 +121,14 @@ export function isProjectRemoteIdentityPending(
 
 const HOST_LOCAL_PROJECT_ID_PREFIX = 'repo:'
 
+/** A provider host without its port, an absent host meaning github.com. */
+function providerHostname(host: string | undefined): string {
+  return (host ?? 'github.com').trim().toLowerCase().replace(/:\d+$/, '')
+}
+
 /** Same provider server, ignoring the port: an API endpoint and a transport URL differ there. */
 function sameProviderServer(left: string | undefined, right: string | undefined): boolean {
-  const hostname = (host: string | undefined): string =>
-    (host ?? 'github.com').trim().toLowerCase().replace(/:\d+$/, '')
-  return hostname(left) === hostname(right)
+  return providerHostname(left) === providerHostname(right)
 }
 
 /**

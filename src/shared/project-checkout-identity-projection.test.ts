@@ -5,6 +5,7 @@ import {
 } from './project-host-setup-projection'
 import type { Repo } from './repo-types'
 
+/** A git repo row with the fields the projection reads; overrides win. */
 function repo(overrides: Partial<Repo> & Pick<Repo, 'id' | 'path' | 'displayName'>): Repo {
   return {
     badgeColor: '#737373',
