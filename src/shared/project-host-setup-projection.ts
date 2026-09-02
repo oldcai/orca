@@ -120,11 +120,6 @@ export function isProjectRemoteIdentityPending(
 
 const HOST_LOCAL_PROJECT_ID_PREFIX = 'repo:'
 
-/**
- * The repo this checkout *is*, as a project id — its own remote, never the fork parent or template
- * it descends from. Null when no remote identity has settled, and for the resolved "no usable
- * remote" marker.
- */
 /** Same provider server, ignoring the port: an API endpoint and a transport URL differ there. */
 function sameProviderServer(left: string | undefined, right: string | undefined): boolean {
   const hostname = (host: string | undefined): string =>
@@ -132,6 +127,11 @@ function sameProviderServer(left: string | undefined, right: string | undefined)
   return hostname(left) === hostname(right)
 }
 
+/**
+ * The repo this checkout *is*, as a project id — its own remote, never the fork parent or template
+ * it descends from. Null when no remote identity has settled, and for the resolved "no usable
+ * remote" marker.
+ */
 export function getProjectCheckoutIdentityKey(
   repo: Pick<Repo, 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string | null {
@@ -209,6 +209,10 @@ export function getAncestorProjectIdentityKey(
   return gitRemoteIdentity ? `git:${gitRemoteIdentity.canonicalKey}` : null
 }
 
+/**
+ * The id every host derives for a repo row, so setups of one project merge across hosts: the
+ * checkout's own remote, else the fork/template ancestor, else the host-local `repo:<id>`.
+ */
 export function getProjectIdentityKey(
   repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): string {

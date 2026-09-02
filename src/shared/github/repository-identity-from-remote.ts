@@ -42,6 +42,10 @@ function parseGitHubRemotePath(path: string): { owner: string; repo: string } | 
   return owner && repo ? { owner, repo } : null
 }
 
+/**
+ * The GitHub identity a `host/owner/repo` canonical key names, or null for a non-GitHub host. The
+ * key drops HTTP(S) ports, so prefer `parseGitHubRemoteUrl` when the URL is available.
+ */
 export function parseGitHubCanonicalKey(
   canonicalKey: string | undefined
 ): ProjectProviderIdentity | null {
@@ -58,6 +62,10 @@ export function parseGitHubCanonicalKey(
   return path ? projectProviderIdentity(host, path.owner, path.repo) : null
 }
 
+/**
+ * The GitHub identity a remote URL names — SCP-style or any git/ssh/http(s) URL — or null when
+ * the host is not a GitHub server. Keeps an HTTP(S) port, which identifies a GHES API endpoint.
+ */
 export function parseGitHubRemoteUrl(
   remoteUrl: string | undefined
 ): ProjectProviderIdentity | null {
