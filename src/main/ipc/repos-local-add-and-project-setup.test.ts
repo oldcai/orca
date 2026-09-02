@@ -328,18 +328,23 @@ describe('repos:add + repos:clone', () => {
     expect(result).toHaveProperty('project.id', 'github:github.acme.test/acme/orca')
   })
 
-  it('links a folder into a checkout-keyed project with the carried git remote identity', async () => {
-    const added: Record<string, unknown>[] = []
-    mockStore.getRepos.mockImplementation(() => added)
-    mockStore.addRepo.mockImplementation((repo: Record<string, unknown>) => added.push(repo))
+  /** Applies `updateRepo` calls to `rows` in place and returns a copy of the row, like the store. */
+  function mockRepoUpdatesInto(rows: Record<string, unknown>[]): void {
     mockStore.updateRepo.mockImplementation((id, updates) => {
-      const repo = added.find((entry) => entry.id === id)
+      const repo = rows.find((entry) => entry.id === id)
       if (!repo) {
         return null
       }
       Object.assign(repo, updates)
       return { ...repo }
     })
+  }
+
+  it('links a folder into a checkout-keyed project with the carried git remote identity', async () => {
+    const added: Record<string, unknown>[] = []
+    mockStore.getRepos.mockImplementation(() => added)
+    mockStore.addRepo.mockImplementation((repo: Record<string, unknown>) => added.push(repo))
+    mockRepoUpdatesInto(added)
     // Why derived from the repo: the target host has no record of the project until the identity is
     // stamped, so the request's copy is the only source the align step can use.
     mockStore.getProjects.mockImplementation(() => {
@@ -395,14 +400,7 @@ describe('repos:add + repos:clone', () => {
     }
     const repos = [existing as Record<string, unknown>]
     mockStore.getRepos.mockImplementation(() => repos)
-    mockStore.updateRepo.mockImplementation((id, updates) => {
-      const repo = repos.find((entry) => entry.id === id)
-      if (!repo) {
-        return null
-      }
-      Object.assign(repo, updates)
-      return { ...repo }
-    })
+    mockRepoUpdatesInto(repos)
     mockStore.getProjects.mockImplementation(() => {
       const identity = existing.gitRemoteIdentity as { origin?: unknown }
       return identity.origin

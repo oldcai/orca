@@ -24,10 +24,13 @@ export function resolveProjectCloneUrlPrefill(
   const sourceRepoIds =
     projects.find((candidate) => candidate.id === selectedProjectId)?.sourceRepoIds ?? []
   const remoteUrl = sourceRepoIds
-    .map((sourceId) => {
-      const identity = repos.find((repo) => repo.id === sourceId)?.gitRemoteIdentity
-      return identity ? getCheckoutRemote(identity).remoteUrl : undefined
-    })
+    .map((sourceId) => checkoutRemoteUrl(repos, sourceId))
     .find((url): url is string => Boolean(url))
   return remoteUrl ? stripCredentialsFromMessage(remoteUrl) : ''
+}
+
+/** The URL of a source repo's own remote — never its fork or template parent — once its identity has settled. */
+function checkoutRemoteUrl(repos: readonly Repo[], repoId: string): string | undefined {
+  const identity = repos.find((repo) => repo.id === repoId)?.gitRemoteIdentity
+  return identity ? getCheckoutRemote(identity).remoteUrl : undefined
 }
